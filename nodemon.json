@@ -1,0 +1,13 @@
+{
+  "watch": [
+    "commands/slash",
+    "commands/message",
+    "events",
+    "index.js",
+    "config.json",
+    "command-cache.json",
+    "commands-cache.json"
+  ],
+  "ext": "js,json",
+  "ignore": ["node_modules"]
+}

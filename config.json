@@ -1,0 +1,7 @@
+{
+  "prefix": "!",
+  "defaultCooldown": 3,
+  "clientId": "YOUR_BOTS_CLIENT_ID",
+  "guildId": "YOUR_GUILD_ID",
+  "ownerId": "YOUR_OWNER_ID"
+}

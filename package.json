@@ -1,0 +1,21 @@
+{
+  "name": "extreme-handler",
+  "version": "1.0.0",
+  "description": "A robust command and event handler",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.2",
+    "@discordjs/rest": "^2.4.0",
+    "discord-api-types": "^0.37.100",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "author": "famq",
+  "license": "ISC"
+}
