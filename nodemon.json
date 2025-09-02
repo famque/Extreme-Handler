@@ -4,9 +4,7 @@
     "commands/message",
     "events",
     "index.js",
-    "config.json",
-    "command-cache.json",
-    "commands-cache.json"
+    "config.json"
   ],
   "ext": "js,json",
   "ignore": ["node_modules"]

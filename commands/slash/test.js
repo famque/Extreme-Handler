@@ -13,7 +13,7 @@ const {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("test")
+    .setName("test-one")
     .setDescription(
       "A test command with an embed, button, select menu, and modal."
     ),

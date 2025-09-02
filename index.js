@@ -1,7 +1,6 @@
 require("dotenv").config();
 const fs = require("fs").promises;
 const path = require("path");
-const crypto = require("crypto");
 const {
   Client,
   GatewayIntentBits,
@@ -40,25 +39,8 @@ client.cooldowns = new Map();
 client.prefixCommands = new Map();
 
 const token = process.env.DISCORD_TOKEN;
-const clientId = config.clientId || "YOUR_BOTS_CLIENT_ID";
+const clientId = config.clientId || "YOUR_CLIENT_ID";
 const guildId = process.env.NODE_ENV === "development" ? config.guildId : null;
-
-let lastRegisteredHash = "";
-let commandCache = {};
-try {
-  commandCache = require("./commands-cache.json");
-  lastRegisteredHash = commandCache.hash || "";
-} catch (error) {
-  console.warn(
-    "[WARNING] commands-cache.json not found; will create on registration."
-  );
-}
-let fileCache = {};
-try {
-  fileCache = require("./command-cache.json");
-} catch (error) {
-  console.warn("[WARNING] command-cache.json not found; will create on load.");
-}
 
 // Centralized error handling
 async function handleError(interactionOrMessage, commandName, error) {
@@ -84,7 +66,6 @@ async function handleError(interactionOrMessage, commandName, error) {
 // Load commands recursively
 async function loadCommands(dir, isSlash, isMessage) {
   const files = await fs.readdir(dir, { withFileTypes: true });
-  const newCache = {};
   for (const file of files) {
     const filePath = path.join(dir, file.name);
     if (file.isDirectory()) {
@@ -92,38 +73,6 @@ async function loadCommands(dir, isSlash, isMessage) {
       continue;
     }
     if (!file.name.endsWith(".js")) continue;
-
-    const stats = await fs.stat(filePath);
-    const cacheKey = filePath;
-    const cacheEntry = fileCache[cacheKey];
-    if (cacheEntry && cacheEntry.mtime === stats.mtimeMs) {
-      client.commands.set(cacheEntry.name, cacheEntry.command);
-      if (isSlash && cacheEntry.command.data) {
-        console.log(
-          `[INFO] Loaded cached slash command: ${cacheEntry.command.data.name} from ${filePath}`
-        );
-      }
-      if (isMessage && cacheEntry.command.name) {
-        console.log(
-          `[INFO] Loaded cached message command: ${cacheEntry.command.name} from ${filePath}`
-        );
-        if (cacheEntry.command.aliases?.length) {
-          cacheEntry.command.aliases.forEach((alias) =>
-            client.commands.set(alias, cacheEntry.command)
-          );
-        }
-        const prefix = cacheEntry.command.prefix || config.prefix;
-        client.prefixCommands.set(
-          `${prefix}:${cacheEntry.command.name}`,
-          cacheEntry.command
-        );
-        cacheEntry.command.aliases?.forEach((alias) =>
-          client.prefixCommands.set(`${prefix}:${alias}`, cacheEntry.command)
-        );
-      }
-      newCache[cacheKey] = cacheEntry;
-      continue;
-    }
 
     try {
       const command = require(filePath);
@@ -147,9 +96,6 @@ async function loadCommands(dir, isSlash, isMessage) {
 
       if (hasSlash && isSlash) {
         client.commands.set(command.data.name, command);
-        console.log(
-          `[INFO] Loaded slash command: ${command.data.name} from ${filePath}`
-        );
       }
       if (hasMessage && isMessage) {
         client.commands.set(command.name, command);
@@ -163,32 +109,12 @@ async function loadCommands(dir, isSlash, isMessage) {
         command.aliases?.forEach((alias) =>
           client.prefixCommands.set(`${prefix}:${alias}`, command)
         );
-        console.log(
-          `[INFO] Loaded message command: ${command.name} from ${filePath}`
-        );
       }
-
-      newCache[cacheKey] = {
-        name: command.data?.name || command.name,
-        command,
-        mtime: stats.mtimeMs,
-      };
     } catch (error) {
       console.error(
         `[ERROR] Failed to load command ${file.name} from ${filePath}: ${error.message}`
       );
     }
-  }
-  fileCache = newCache;
-  try {
-    await fs.writeFile(
-      path.join(__dirname, "command-cache.json"),
-      JSON.stringify(fileCache, null, 2)
-    );
-  } catch (error) {
-    console.error(
-      `[ERROR] Failed to save command-cache.json: ${error.message}`
-    );
   }
 }
 
@@ -206,7 +132,6 @@ async function loadEvents(dir) {
           client[event.once ? "once" : "on"](event.name, (...args) =>
             event.execute(...args)
           );
-          console.log(`[INFO] Loaded event: ${event.name} from ${filePath}`);
         } else {
           console.warn(
             `[WARNING] Event at ${filePath} missing 'name' or 'execute' properties.`
@@ -334,34 +259,14 @@ async function registerCommands() {
   const commands = client.commands
     .filter((command) => "data" in command)
     .map((command) => command.data.toJSON());
-  const commandHash = crypto
-    .createHash("md5")
-    .update(JSON.stringify(commands))
-    .digest("hex");
-  if (commandHash === lastRegisteredHash) {
-    console.log("[INFO] No changes in slash commands; skipping registration.");
-    return;
-  }
-
   const rest = new REST({ version: "10" }).setToken(token);
   try {
-    console.log("[INFO] Started refreshing application (/) commands.");
     await rest.put(
       guildId
         ? Routes.applicationGuildCommands(clientId, guildId)
         : Routes.applicationCommands(clientId),
       { body: commands }
     );
-    console.log(
-      `[INFO] Successfully registered commands ${
-        guildId ? `for guild ${guildId}` : "globally"
-      }.`
-    );
-    await fs.writeFile(
-      path.join(__dirname, "commands-cache.json"),
-      JSON.stringify({ hash: commandHash, commands }, null, 2)
-    );
-    lastRegisteredHash = commandHash;
   } catch (error) {
     if (error.code === 429) {
       console.warn("[WARNING] Rate limit hit; retrying in 5s.");
@@ -377,34 +282,18 @@ async function registerCommands() {
           guildId ? `for guild ${guildId}` : "globally"
         } after retry.`
       );
-      await fs.writeFile(
-        path.join(__dirname, "commands-cache.json"),
-        JSON.stringify({ hash: commandHash, commands }, null, 2)
-      );
-      lastRegisteredHash = commandHash;
     } else {
       console.error(`[ERROR] Failed to register commands: ${error.message}`);
     }
   }
 }
 
-// Handle graceful shutdown
-process.on("SIGTERM", async () => {
-  console.log("[INFO] Received SIGTERM; shutting down.");
-  await client.destroy();
-  process.exit(0);
-});
-process.on("SIGINT", async () => {
-  console.log("[INFO] Received SIGINT; shutting down.");
-  await client.destroy();
-  process.exit(0);
-});
-
 // Initialize and login
 (async () => {
   await loadEvents(path.join(__dirname, "events"));
   await loadCommands(path.join(__dirname, "commands/slash"), true, false);
   await loadCommands(path.join(__dirname, "commands/message"), false, true);
+  console.log("[INFO] Successfully loaded events and commands.");
   await client.login(token);
   await registerCommands();
 })();
