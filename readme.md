@@ -42,6 +42,6 @@ Setup:
 - Edit line 42 in index.js in-case your config fails to read your bots clientID.
 - Run 'npm install'
 - Enable Message Content Intent and Server Members Intent in the Discord Developer Portal
-- Run the bot using 'npm dev'(development) or 'npm start'(production) in terminal
+- Run the bot using 'npm run dev'(development) or 'npm start'(production) in terminal
 - Confirm the test commands work '/test' '?test' 'owner-test'
 - Start creating commands!
